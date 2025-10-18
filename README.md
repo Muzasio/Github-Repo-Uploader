@@ -13,7 +13,7 @@ A powerful, **GUI-driven Bash script** for managing GitHub repositories with an 
 - **Create New Repositories**: Upload local projects to GitHub with custom names, descriptions, licenses, and visibility.  
 - **Update Existing Repositories**: Push changes with automatic commit messages.  
 - **Clone Repositories**: Clone any repo with progress tracking.
-
+- **Added manual license function
 ### 🔍 Repository Insights 
 - **View Repo Information**: Stars, forks, issues, creation date, and more.(not tested yet)  
 - **Check Issues**: Open/closed issue counts at a glance.  

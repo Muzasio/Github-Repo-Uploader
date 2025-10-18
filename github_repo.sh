@@ -88,7 +88,85 @@ validate_credentials() {
     local http_code=${response: -3}
     [[ "$http_code" == "200" ]]
 }
+# Generate LICENSE file content based on license type
+generate_license_file() {
+    local license_type="$1"
+    local year=$(date +%Y)
+    local username="$GITHUB_USER"
+    
+    case "$license_type" in
+        "MIT")
+            cat << EOF
+MIT License
 
+Copyright (c) $year $username
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+EOF
+            ;;
+        "Apache-2.0")
+            cat << EOF
+Apache License
+Version 2.0, January 2004
+http://www.apache.org/licenses/
+
+Copyright (c) $year $username
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+EOF
+            ;;
+        "GPL-3.0")
+            cat << EOF
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) $year $username
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+EOF
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
 # Delete account credentials
 delete_credentials() {
     if [[ -f "$CONFIG_FILE" ]]; then
@@ -111,34 +189,33 @@ repo_exists() {
 }
 
 # Create GitHub repository
+# Create GitHub repository
 create_repo() {
     local repo_name="$1"
     local description="$2"
     local license="$3"
     local private="$4"
-    
-    local license_template=""
-    if [[ -n "$license" && "$license" != "none" ]]; then
-        license_template=",\"license_template\":\"$license\""
-    fi
+
+    # Build the JSON data without license template
+    local json_data="{
+        \"name\": \"$repo_name\",
+        \"description\": \"$description\",
+        \"private\": $private,
+        \"auto_init\": false
+    }"
     
     # Log the request details for debugging
     echo "Creating repository: $repo_name" >> "$LOG_FILE"
     echo "Description: $description" >> "$LOG_FILE"
     echo "License: $license" >> "$LOG_FILE"
     echo "Private: $private" >> "$LOG_FILE"
+    echo "JSON Data: $json_data" >> "$LOG_FILE"
     
     local response=$(curl -w "%{http_code}" -s -u "$GITHUB_USER:$GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
-        -d "{
-            \"name\": \"$repo_name\",
-            \"description\": \"$description\",
-            \"private\": $private,
-            \"auto_init\": false
-            $license_template
-        }" \
+        -d "$json_data" \
         https://api.github.com/user/repos)
-    
+
     # Extract HTTP status code and response body
     local http_code=${response: -3}
     local response_body=${response:0:${#response}-3}
@@ -168,8 +245,14 @@ create_repo() {
         zenity --error --text="Repository creation failed: Unexpected API response. Check log: $LOG_FILE"
         return 1
     fi
-    
-    echo "$response_body" | jq -r '.html_url'
+
+    # Get the actual repository name as stored by GitHub
+    local actual_repo_name=$(get_actual_repo_name "$response_body")
+    local repo_url=$(echo "$response_body" | jq -r '.html_url')
+
+    # Return both URL and actual name
+    echo "$repo_url"
+    echo "$actual_repo_name"
 }
 
 # Show folder content preview
@@ -189,14 +272,34 @@ show_folder_content() {
         --height=400
 }
 
-# Initialize Git repository with content
+
+# Initialize Git repository with content including LICENSE file
 initialize_repo() {
     local project_dir="$1"
+    local license_type="$2"
     
     cd "$project_dir" || {
         zenity --error --text="Failed to access project directory: $project_dir"
         return 1
     }
+    
+    # Create LICENSE file if specified and not "none"
+    if [[ -n "$license_type" && "$license_type" != "none" ]]; then
+        echo "Creating LICENSE file with $license_type license..." >> "$LOG_FILE"
+        if generate_license_file "$license_type" > "LICENSE"; then
+            echo "✓ Created LICENSE file with $license_type license" >> "$LOG_FILE"
+        else
+            echo "✗ Failed to create LICENSE file for $license_type" >> "$LOG_FILE"
+            zenity --warning --text="Could not create LICENSE file for $license_type. Continuing without license file."
+        fi
+    fi
+    
+    # Check if README.md exists, create minimal one if not
+    if [[ ! -f "README.md" ]]; then
+        echo "# $(basename "$project_dir")" > README.md
+        echo "Project description" >> README.md
+        echo "✓ Created minimal README.md" >> "$LOG_FILE"
+    fi
     
     # Initialize repository only if not already a Git repo
     if [[ ! -d ".git" ]]; then
@@ -204,6 +307,7 @@ initialize_repo() {
             zenity --error --text="Failed to initialize Git repository"
             return 1
         }
+        echo "✓ Initialized new Git repository" >> "$LOG_FILE"
     fi
     
     # Add ALL files (including hidden ones except .git)
@@ -211,6 +315,7 @@ initialize_repo() {
         zenity --error --text="Failed to add files to Git"
         return 1
     }
+    echo "✓ Added all files to Git staging" >> "$LOG_FILE"
     
     # Check if there are files to commit
     if [[ -n "$(git status --porcelain)" ]]; then
@@ -218,18 +323,10 @@ initialize_repo() {
             zenity --error --text="Failed to create initial commit"
             return 1
         }
+        echo "✓ Created initial commit" >> "$LOG_FILE"
     else
-        # Create minimal README if directory is empty
-        echo "# $(basename "$project_dir")" > README.md
-        echo "Project description" >> README.md
-        git add README.md || {
-            zenity --error --text="Failed to add README"
-            return 1
-        }
-        git commit --quiet -m "Initial commit with README" || {
-            zenity --error --text="Failed to create initial commit"
-            return 1
-        }
+        zenity --warning --text="No files to commit. Repository is empty."
+        echo "⚠ No files to commit" >> "$LOG_FILE"
     fi
 }
 
@@ -533,7 +630,7 @@ main() {
             repo_url=$(create_repo "$repo_name" "$description" "$license" "$private") || exit 1
             
             # Initialize and push
-            initialize_repo "$project_dir" || exit 1
+            initialize_repo "$project_dir" "$license" || exit 1
             
             # Ensure we're on main branch
             git checkout -B main || {
