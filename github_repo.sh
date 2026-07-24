@@ -287,9 +287,9 @@ initialize_repo() {
     if [[ -n "$license_type" && "$license_type" != "none" ]]; then
         echo "Creating LICENSE file with $license_type license..." >> "$LOG_FILE"
         if generate_license_file "$license_type" > "LICENSE"; then
-            echo "✓ Created LICENSE file with $license_type license" >> "$LOG_FILE"
+            echo "Created LICENSE file with $license_type license" >> "$LOG_FILE"
         else
-            echo "✗ Failed to create LICENSE file for $license_type" >> "$LOG_FILE"
+            echo "Failed to create LICENSE file for $license_type" >> "$LOG_FILE"
             zenity --warning --text="Could not create LICENSE file for $license_type. Continuing without license file."
         fi
     fi
@@ -298,7 +298,7 @@ initialize_repo() {
     if [[ ! -f "README.md" ]]; then
         echo "# $(basename "$project_dir")" > README.md
         echo "Project description" >> README.md
-        echo "✓ Created minimal README.md" >> "$LOG_FILE"
+        echo "Created minimal README.md" >> "$LOG_FILE"
     fi
     
     # Initialize repository only if not already a Git repo
@@ -307,7 +307,7 @@ initialize_repo() {
             zenity --error --text="Failed to initialize Git repository"
             return 1
         }
-        echo "✓ Initialized new Git repository" >> "$LOG_FILE"
+        echo "Initialized new Git repository" >> "$LOG_FILE"
     fi
     
     # Add ALL files (including hidden ones except .git)
@@ -315,7 +315,7 @@ initialize_repo() {
         zenity --error --text="Failed to add files to Git"
         return 1
     }
-    echo "✓ Added all files to Git staging" >> "$LOG_FILE"
+    echo "Added all files to Git staging" >> "$LOG_FILE"
     
     # Check if there are files to commit
     if [[ -n "$(git status --porcelain)" ]]; then
@@ -323,10 +323,10 @@ initialize_repo() {
             zenity --error --text="Failed to create initial commit"
             return 1
         }
-        echo "✓ Created initial commit" >> "$LOG_FILE"
+        echo "Created initial commit" >> "$LOG_FILE"
     else
         zenity --warning --text="No files to commit. Repository is empty."
-        echo "⚠ No files to commit" >> "$LOG_FILE"
+        echo "No files to commit" >> "$LOG_FILE"
     fi
 }
 
@@ -488,7 +488,7 @@ view_repo_info() {
     
     zenity --info \
         --title="Repository Information: $repo_name" \
-        --text="Description: $description\nStars: ⭐ $stars\nForks: 🍴 $forks\nOpen Issues: 🐛 $issues\nURL: $url\nCreated: $created\nLast Updated: $updated" \
+        --text="Description: $description\nStars: $stars\nForks: $forks\nOpen Issues: $issues\nURL: $url\nCreated: $created\nLast Updated: $updated" \
         --width=500 \
         --height=300
 }
@@ -544,7 +544,7 @@ check_issues() {
 # Show token help
 show_token_help() {
     zenity --info --title="GitHub Token Help" \
-        --text="To create a GitHub Personal Access Token:\n\n1. Go to GitHub.com → Settings → Developer settings → Personal access tokens\n2. Click 'Generate new token'\n3. Give it a name and select the 'repo' scope\n4. Click 'Generate token'\n5. Copy the token and use it in this application\n\nNote: The token will only be shown once, so copy it immediately." \
+        --text="To create a GitHub Personal Access Token:\n\n1. Go to GitHub.com -> Settings -> Developer settings -> Personal access tokens\n2. Click 'Generate new token'\n3. Give it a name and select the 'repo' scope\n4. Click 'Generate token'\n5. Copy the token and use it in this application\n\nNote: The token will only be shown once, so copy it immediately." \
         --width=500
 }
 
